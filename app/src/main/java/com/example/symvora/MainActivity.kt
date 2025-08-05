@@ -35,8 +35,57 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SymvoraTheme {
-                SymptomCheckerApp()
+                var showWelcome by remember { mutableStateOf(true) }
+                if (showWelcome) {
+                    WelcomeScreen(onContinue = { showWelcome = false })
+                } else {
+                    SymptomCheckerApp()
+                }
             }
+        }
+    }
+}
+@Composable
+fun WelcomeScreen(onContinue: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF6C63FF), Color(0xFFA084E8))
+                )
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Welcome to Symvora!",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Text(
+            text = "Your AI-powered symptom checker.",
+            fontSize = 16.sp,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = 32.dp, start = 32.dp, end = 32.dp)
+        )
+        Button(
+            onClick = onContinue,
+            shape = RoundedCornerShape(24.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+            modifier = Modifier
+                .width(200.dp)
+                .height(48.dp)
+        ) {
+            Text(
+                text = "Continue",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF6C63FF)
+            )
         }
     }
 }
