@@ -40,6 +40,147 @@ enum class Screen {
     Welcome, Symptoms, History, Settings
 }
 
+@Composable
+fun HistoryScreen(onNavigate: (Screen) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Symptom History",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF2E2E2E),
+            textAlign = TextAlign.Center,
+            letterSpacing = (-0.5).sp,
+            modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
+        )
+
+        Text(
+            text = "Your previous symptom checks will appear here.",
+            fontSize = 16.sp,
+            color = Color(0xFF666666),
+            textAlign = TextAlign.Center
+        )
+
+        Box(modifier = Modifier.weight(1f)) { }
+
+        // Bottom Navigation
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = Color(0xFFF9F9F9),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            NavigationItem(
+                icon = "🧪",
+                label = "Symptoms",
+                isSelected = false,
+                onClick = { onNavigate(Screen.Symptoms) }
+            )
+            NavigationItem(
+                icon = "📊",
+                label = "History",
+                isSelected = true,
+                onClick = { onNavigate(Screen.History) }
+            )
+            NavigationItem(
+                icon = "⚙️",
+                label = "Settings",
+                isSelected = false,
+                onClick = { onNavigate(Screen.Settings) }
+            )
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(onNavigate: (Screen) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Settings",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF2E2E2E),
+            textAlign = TextAlign.Center,
+            letterSpacing = (-0.5).sp,
+            modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFF9F9F9)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "App Version",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF2E2E2E)
+                )
+                Text(
+                    text = "1.0.0",
+                    fontSize = 14.sp,
+                    color = Color(0xFF666666)
+                )
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) { }
+
+        // Bottom Navigation
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = Color(0xFFF9F9F9),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            NavigationItem(
+                icon = "🧪",
+                label = "Symptoms",
+                isSelected = false,
+                onClick = { onNavigate(Screen.Symptoms) }
+            )
+            NavigationItem(
+                icon = "📊",
+                label = "History",
+                isSelected = false,
+                onClick = { onNavigate(Screen.History) }
+            )
+            NavigationItem(
+                icon = "⚙️",
+                label = "Settings",
+                isSelected = true,
+                onClick = { onNavigate(Screen.Settings) }
+            )
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -311,16 +452,9 @@ fun SymptomCheckerApp(
                     disabledContentColor = Color.White.copy(alpha = 0.6f)
                 )
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    contentAlignment = Alignment.Center
-            ) {
-                if (isLoading) {
+                    if (isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .align(Alignment.Center),
+                        modifier = Modifier.size(24.dp),
                         color = Color.White,
                         strokeWidth = 2.dp
                     )
@@ -330,8 +464,7 @@ fun SymptomCheckerApp(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 0.5.sp,
-                        color = Color.White,
-                        modifier = Modifier.align(Alignment.Center)
+                        color = Color.White
                     )
                 }
             }
@@ -481,7 +614,7 @@ fun HistoryScreen(onNavigate: (Screen) -> Unit) {
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Box(modifier = Modifier.weight(1f)) { }
 
         // Bottom Navigation
         Row(
