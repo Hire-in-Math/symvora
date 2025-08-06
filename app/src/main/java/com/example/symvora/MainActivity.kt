@@ -107,7 +107,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     .size(200.dp)
                     .offset(
                         x = (index - 1) * 100.dp,
-                        y = with(LocalDensity.current) { (offset * 50).dp }
+                        y = 50.dp * offset
                     )
                     .background(
                         Color.White.copy(alpha = 0.1f),
