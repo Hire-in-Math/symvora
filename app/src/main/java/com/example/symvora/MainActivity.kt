@@ -14,8 +14,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +39,70 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
+
+// Data model for symptom history
+data class SymptomHistoryEntry(
+    val id: String = UUID.randomUUID().toString(),
+    val symptoms: String,
+    val aiResponse: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+// Global history storage
+object SymptomHistoryManager {
+    private val _history = mutableStateListOf<SymptomHistoryEntry>()
+    
+    init {
+        // Add some sample data for testing
+        addSampleData()
+    }
+    
+    fun addEntry(entry: SymptomHistoryEntry) {
+        _history.add(0, entry) // Add to beginning
+    }
+    
+    fun getAllEntries(): List<SymptomHistoryEntry> = _history.toList()
+    
+    fun searchEntries(query: String): List<SymptomHistoryEntry> {
+        if (query.isBlank()) return getAllEntries()
+        return _history.filter { entry ->
+            entry.symptoms.contains(query, ignoreCase = true) ||
+            entry.aiResponse.contains(query, ignoreCase = true) ||
+            entry.id.contains(query, ignoreCase = true)
+        }.sortedByDescending { it.timestamp }
+    }
+    
+    fun clearHistory() {
+        _history.clear()
+    }
+    
+    // Expose the mutable state list for observation
+    fun getHistoryState() = _history
+    
+    private fun addSampleData() {
+        val sampleEntries = listOf(
+            SymptomHistoryEntry(
+                symptoms = "I have a headache and fever for the past 2 days",
+                aiResponse = "Based on your symptoms, here are some general possibilities:\n\nPossible Conditions:\n• Common cold or flu\n• Migraine\n• Tension headache\n\nGeneral Advice:\n• Rest and stay hydrated\n• Take over-the-counter pain relievers\n• Monitor your temperature\n\n⚠️ IMPORTANT: This is for informational purposes only. Always consult a healthcare professional for proper diagnosis and treatment.",
+                timestamp = System.currentTimeMillis() - 86400000 // 1 day ago
+            ),
+            SymptomHistoryEntry(
+                symptoms = "Cough and sore throat, feeling tired",
+                aiResponse = "Based on your symptoms, here are some general possibilities:\n\nPossible Conditions:\n• Upper respiratory infection\n• Common cold\n• Seasonal allergies\n\nGeneral Advice:\n• Rest and stay hydrated\n• Gargle with warm salt water\n• Use throat lozenges\n\n⚠️ IMPORTANT: This is for informational purposes only. Always consult a healthcare professional for proper diagnosis and treatment.",
+                timestamp = System.currentTimeMillis() - 172800000 // 2 days ago
+            ),
+            SymptomHistoryEntry(
+                symptoms = "Stomach pain and nausea after eating",
+                aiResponse = "Based on your symptoms, here are some general possibilities:\n\nPossible Conditions:\n• Food poisoning\n• Gastritis\n• Indigestion\n\nGeneral Advice:\n• Stay hydrated with clear fluids\n• Eat bland foods (BRAT diet)\n• Avoid spicy or fatty foods\n\n⚠️ IMPORTANT: This is for informational purposes only. Always consult a healthcare professional for proper diagnosis and treatment.",
+                timestamp = System.currentTimeMillis() - 259200000 // 3 days ago
+            )
+        )
+        
+        _history.addAll(sampleEntries)
+    }
+}
 
 enum class Screen {
     Welcome, Symptoms, History, Settings
@@ -80,6 +148,28 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HistoryScreen(onNavigate: (Screen) -> Unit) {
+    var searchQuery by remember { mutableStateOf("") }
+    
+    // Observe the mutable state list directly
+    val historyState = SymptomHistoryManager.getHistoryState()
+    val historyEntries by derivedStateOf {
+        SymptomHistoryManager.searchEntries(searchQuery)
+    }
+    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault()) }
+    
+    // Ensure sample data is loaded
+    LaunchedEffect(Unit) {
+        if (SymptomHistoryManager.getAllEntries().isEmpty()) {
+            // Add sample data if empty
+            SymptomHistoryManager.addEntry(
+                SymptomHistoryEntry(
+                    symptoms = "Sample headache and fever",
+                    aiResponse = "This is a sample AI response for testing the history feature."
+                )
+            )
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -87,24 +177,135 @@ fun HistoryScreen(onNavigate: (Screen) -> Unit) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Symptom History",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF2E2E2E),
-            textAlign = TextAlign.Center,
-            letterSpacing = (-0.5).sp,
-            modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Symptom History",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF2E2E2E),
+                letterSpacing = (-0.5).sp
+            )
+            Text(
+                text = if (searchQuery.isBlank()) 
+                    "${historyEntries.size} entries (${SymptomHistoryManager.getAllEntries().size} total)" 
+                else 
+                    "${historyEntries.size} found",
+                fontSize = 12.sp,
+                color = Color(0xFF666666),
+                fontWeight = FontWeight.Medium
+            )
+        }
 
-        Text(
-            text = "Your previous symptom checks will appear here.",
-            fontSize = 16.sp,
-            color = Color(0xFF666666),
-            textAlign = TextAlign.Center
-        )
+        // Search Bar
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFF9F9F9)
+            )
+        ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    placeholder = {
+                        Text(
+                            text = "Search previous symptoms...",
+                            fontSize = 14.sp,
+                            color = Color(0xFF999999)
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF6C63FF),
+                        unfocusedBorderColor = Color(0xFFE0E0E0),
+                        focusedLabelColor = Color(0xFF6C63FF),
+                        unfocusedLabelColor = Color(0xFF999999)
+                    )
+                )
+                
+                // Debug button to add test entry
+                Button(
+                    onClick = {
+                        SymptomHistoryManager.addEntry(
+                            SymptomHistoryEntry(
+                                symptoms = "Test symptom entry",
+                                aiResponse = "This is a test AI response for debugging purposes."
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6C63FF),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Add Test Entry (Debug)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
 
-        Box(modifier = Modifier.weight(1f)) { }
+        // History List
+        if (historyEntries.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = if (searchQuery.isBlank()) "No history yet" else "No matching entries found",
+                        fontSize = 16.sp,
+                        color = Color(0xFF666666),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (searchQuery.isBlank()) "Your symptom checks will appear here" else "Try a different search term",
+                        fontSize = 14.sp,
+                        color = Color(0xFF999999),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    // Debug information
+                    Text(
+                        text = "Debug: Total entries = ${SymptomHistoryManager.getAllEntries().size}",
+                        fontSize = 12.sp,
+                        color = Color(0xFF999999),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(historyEntries) { entry ->
+                    HistoryEntryCard(entry = entry, dateFormat = dateFormat)
+                }
+            }
+        }
 
         // Bottom Navigation
         Row(
@@ -141,7 +342,91 @@ fun HistoryScreen(onNavigate: (Screen) -> Unit) {
 }
 
 @Composable
+fun HistoryEntryCard(
+    entry: SymptomHistoryEntry,
+    dateFormat: SimpleDateFormat
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Header with date and expand/collapse indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = dateFormat.format(Date(entry.timestamp)),
+                    fontSize = 12.sp,
+                    color = Color(0xFF666666),
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = if (isExpanded) "▼" else "▶",
+                    fontSize = 14.sp,
+                    color = Color(0xFF6C63FF),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            // Symptoms preview
+            Text(
+                text = entry.symptoms,
+                fontSize = 14.sp,
+                color = Color(0xFF2E2E2E),
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 8.dp),
+                maxLines = if (isExpanded) Int.MAX_VALUE else 2
+            )
+            
+            // Expanded AI Response
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    modifier = Modifier.padding(top = 12.dp)
+                ) {
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = Color(0xFFE0E0E0)
+                    )
+                    Text(
+                        text = "AI Analysis:",
+                        fontSize = 12.sp,
+                        color = Color(0xFF6C63FF),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    Text(
+                        text = entry.aiResponse,
+                        fontSize = 13.sp,
+                        color = Color(0xFF2E2E2E),
+                        lineHeight = 18.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(onNavigate: (Screen) -> Unit) {
+    val context = LocalContext.current
+    
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -159,6 +444,7 @@ fun SettingsScreen(onNavigate: (Screen) -> Unit) {
             modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
         )
 
+        // App Version Card
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -180,6 +466,45 @@ fun SettingsScreen(onNavigate: (Screen) -> Unit) {
                     fontSize = 14.sp,
                     color = Color(0xFF666666)
                 )
+            }
+        }
+
+        // Clear History Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFF9F9F9)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Data Management",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF2E2E2E),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Button(
+                    onClick = {
+                        SymptomHistoryManager.clearHistory()
+                        Toast.makeText(context, "History cleared successfully", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF6B6B),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = "Clear Symptom History",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
 
@@ -413,7 +738,7 @@ fun SymptomCheckerApp(
                         CoroutineScope(Dispatchers.Main).launch {
                             delay(2000) // 2 second delay
                             
-                            resultText = """
+                            val aiResponse = """
                                 Based on your symptoms, here are some general possibilities:
                                 
                                 Possible Conditions:
@@ -429,6 +754,16 @@ fun SymptomCheckerApp(
                                 ⚠️ IMPORTANT: This is for informational purposes only. 
                                 Always consult a healthcare professional for proper diagnosis and treatment.
                             """.trimIndent()
+                            
+                            resultText = aiResponse
+                            
+                            // Save to history
+                            SymptomHistoryManager.addEntry(
+                                SymptomHistoryEntry(
+                                    symptoms = symptomText,
+                                    aiResponse = aiResponse
+                                )
+                            )
                             
                             isLoading = false
                         }
