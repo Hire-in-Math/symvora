@@ -257,66 +257,64 @@ fun SymptomCheckerApp(
         }
 
         // 3. Gradient Action Button
-        Button(
-            onClick = {
-                if (symptomText.isNotBlank()) {
-                    isLoading = true
-                    resultText = "Analyzing symptoms..."
-                    
-                    CoroutineScope(Dispatchers.Main).launch {
-                        delay(2000) // 2 second delay
-                        
-                        resultText = """
-                            Based on your symptoms, here are some general possibilities:
-                            
-                            Possible Conditions:
-                            • Common cold or flu
-                            • Seasonal allergies
-                            • Stress-related symptoms
-                            
-                            General Advice:
-                            • Rest and stay hydrated
-                            • Monitor your symptoms
-                            • Avoid self-diagnosis
-                            
-                            ⚠️ IMPORTANT: This is for informational purposes only. 
-                            Always consult a healthcare professional for proper diagnosis and treatment.
-                        """.trimIndent()
-                        
-                        isLoading = false
-                    }
-                } else {
-                    Toast.makeText(context, "Please enter your symptoms first.", Toast.LENGTH_SHORT).show()
-                }
-            },
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .padding(bottom = 24.dp),
-            enabled = symptomText.isNotBlank() && !isLoading,
-            shape = RoundedCornerShape(24.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                .padding(bottom = 24.dp)
         ) {
-            Box(
+            Button(
+                onClick = {
+                    if (symptomText.isNotBlank()) {
+                        isLoading = true
+                        resultText = "Analyzing symptoms..."
+                        
+                        CoroutineScope(Dispatchers.Main).launch {
+                            delay(2000) // 2 second delay
+                            
+                            resultText = """
+                                Based on your symptoms, here are some general possibilities:
+                                
+                                Possible Conditions:
+                                • Common cold or flu
+                                • Seasonal allergies
+                                • Stress-related symptoms
+                                
+                                General Advice:
+                                • Rest and stay hydrated
+                                • Monitor your symptoms
+                                • Avoid self-diagnosis
+                                
+                                ⚠️ IMPORTANT: This is for informational purposes only. 
+                                Always consult a healthcare professional for proper diagnosis and treatment.
+                            """.trimIndent()
+                            
+                            isLoading = false
+                        }
+                    } else {
+                        Toast.makeText(context, "Please enter your symptoms first.", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .height(56.dp)
                     .shadow(
-                        elevation = 8.dp,
-                        shape = RoundedCornerShape(24.dp),
+                        elevation = 4.dp,
+                        shape = RoundedCornerShape(16.dp),
                         spotColor = Color(0xFF6C63FF).copy(alpha = 0.25f)
-                    )
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color(0xFF6C63FF),
-                                Color(0xFF8A7FFF)
-                            )
-                        ),
-                        shape = RoundedCornerShape(24.dp)
-                    )
+                    ),
+                enabled = symptomText.isNotBlank() && !isLoading,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF6C63FF),
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFF6C63FF).copy(alpha = 0.6f),
+                    disabledContentColor = Color.White.copy(alpha = 0.6f)
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
