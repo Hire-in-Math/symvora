@@ -5,8 +5,11 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -18,16 +21,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.GoogleFont
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.shadow
 import com.example.symvora.ui.theme.SymvoraTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+enum class Screen {
+    Welcome, Symptoms, History, Settings
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,11 +46,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SymvoraTheme {
-                var showWelcome by remember { mutableStateOf(true) }
-                if (showWelcome) {
-                    WelcomeScreen(onContinue = { showWelcome = false })
-                } else {
-                    SymptomCheckerApp()
+                var currentScreen by remember { mutableStateOf(Screen.Welcome) }
+                
+                AnimatedVisibility(
+                    visible = currentScreen == Screen.Welcome,
+                    enter = fadeIn() + slideInVertically(),
+                    exit = fadeOut() + slideOutVertically()
+                ) {
+                    WelcomeScreen(onContinue = { currentScreen = Screen.Symptoms })
+                }
+                
+                AnimatedVisibility(
+                    visible = currentScreen != Screen.Welcome,
+                    enter = fadeIn() + slideInVertically(),
+                    exit = fadeOut() + slideOutVertically()
+                ) {
+                    SymptomCheckerApp(
+                        currentScreen = currentScreen,
+                        onScreenChange = { currentScreen = it }
+                    )
                 }
             }
         }
@@ -47,51 +72,109 @@ class MainActivity : ComponentActivity() {
 }
 @Composable
 fun WelcomeScreen(onContinue: () -> Unit) {
-    Column(
+    var isAnimated by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isAnimated) 1f else 0.8f,
+        animationSpec = tween(1000, easing = EaseOutElastic)
+    )
+    
+    LaunchedEffect(Unit) {
+        isAnimated = true
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color(0xFF6C63FF), Color(0xFFA084E8))
                 )
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            )
     ) {
-        Text(
-            text = "Welcome to Symvora!",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Text(
-            text = "Your AI-powered symptom checker.",
-            fontSize = 16.sp,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 32.dp, start = 32.dp, end = 32.dp)
-        )
-        Button(
-            onClick = onContinue,
-            shape = RoundedCornerShape(24.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-            modifier = Modifier
-                .width(200.dp)
-                .height(48.dp)
-        ) {
-            Text(
-                text = "Continue",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF6C63FF)
+        // Background animated circles
+        repeat(3) { index ->
+            val infiniteTransition = rememberInfiniteTransition()
+            val offset by infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, delayMillis = index * 400),
+                    repeatMode = RepeatMode.Reverse
+                )
+            )
+            
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .offset(x = (index - 1) * 100.dp, y = offset * 50.dp)
+                    .background(
+                        Color.White.copy(alpha = 0.1f),
+                        shape = CircleShape
+                    )
             )
         }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .scale(scale),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Welcome to Symvora!",
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 16.dp),
+                letterSpacing = (-1).sp
+            )
+            
+            Text(
+                text = "Your AI-powered symptom checker.",
+                fontSize = 18.sp,
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Normal,
+                letterSpacing = 0.sp,
+                modifier = Modifier.padding(bottom = 48.dp, start = 32.dp, end = 32.dp)
+            )
+            
+            Button(
+                onClick = onContinue,
+                shape = RoundedCornerShape(32.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White
+                ),
+                modifier = Modifier
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(32.dp),
+                        spotColor = Color.Black.copy(alpha = 0.25f)
+                    )
+                    .width(220.dp)
+                    .height(56.dp),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 0.dp
+                )
+            ) {
+                Text(
+                    text = "Get Started",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF6C63FF),
+                    letterSpacing = 0.5.sp
+                )
+            }
     }
 }
 
 @Composable
-fun SymptomCheckerApp() {
+fun SymptomCheckerApp(
+    currentScreen: Screen,
+    onScreenChange: (Screen) -> Unit
+) {
     var symptomText by remember { mutableStateOf("") }
     var resultText by remember { mutableStateOf("AI Response will appear here...") }
     var isLoading by remember { mutableStateOf(false) }
@@ -107,10 +190,11 @@ fun SymptomCheckerApp() {
         // 1. Top Header Bar
         Text(
             text = "Symptom Checker AI",
-            fontSize = 22.sp,
-            fontWeight = FontWeight.ExtraBold,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
             color = Color(0xFF2E2E2E),
             textAlign = TextAlign.Center,
+            letterSpacing = (-0.5).sp,
             modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
         )
 
@@ -206,11 +290,16 @@ fun SymptomCheckerApp() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(24.dp),
+                        spotColor = Color(0xFF6C63FF).copy(alpha = 0.25f)
+                    )
                     .background(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
                                 Color(0xFF6C63FF),
-                                Color(0xFFA084E8)
+                                Color(0xFF8A7FFF)
                             )
                         ),
                         shape = RoundedCornerShape(24.dp)
@@ -226,9 +315,10 @@ fun SymptomCheckerApp() {
                     )
                 } else {
                     Text(
-                        text = "Get AI Suggestions",
-                        fontSize = 16.sp,
+                        text = "Analyze Symptoms",
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp,
                         color = Color.White,
                         modifier = Modifier.align(Alignment.Center)
                     )
@@ -296,51 +386,61 @@ fun SymptomCheckerApp() {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "🧪",
-                    fontSize = 24.sp
-                )
-                Text(
-                    text = "Symptoms",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF6C63FF)
-                )
-            }
+            NavigationItem(
+                icon = "🧪",
+                label = "Symptoms",
+                isSelected = currentScreen == Screen.Symptoms,
+                onClick = { onScreenChange(Screen.Symptoms) }
+            )
             
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "📊",
-                    fontSize = 24.sp
-                )
-                Text(
-                    text = "History",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF999999)
-                )
-            }
+            NavigationItem(
+                icon = "📊",
+                label = "History",
+                isSelected = currentScreen == Screen.History,
+                onClick = { onScreenChange(Screen.History) }
+            )
             
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "⚙️",
-                    fontSize = 24.sp
-                )
-                Text(
-                    text = "Settings",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF999999)
-                )
-            }
+            NavigationItem(
+                icon = "⚙️",
+                label = "Settings",
+                isSelected = currentScreen == Screen.Settings,
+                onClick = { onScreenChange(Screen.Settings) }
+            )
         }
+    }
+}
+
+@Composable
+fun NavigationItem(
+    icon: String,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.1f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .scale(scale)
+    ) {
+        Text(
+            text = icon,
+            fontSize = 24.sp
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (isSelected) Color(0xFF6C63FF) else Color(0xFF999999)
+        )
     }
 }
 
@@ -348,6 +448,9 @@ fun SymptomCheckerApp() {
 @Composable
 fun SymptomCheckerAppPreview() {
     SymvoraTheme {
-        SymptomCheckerApp()
+        SymptomCheckerApp(
+            currentScreen = Screen.Symptoms,
+            onScreenChange = {}
+        )
     }
 }
