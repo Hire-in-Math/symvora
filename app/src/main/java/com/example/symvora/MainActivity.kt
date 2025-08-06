@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -21,10 +22,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.GoogleFont
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -106,7 +105,10 @@ fun WelcomeScreen(onContinue: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(200.dp)
-                    .offset(x = (index - 1) * 100.dp, y = offset * 50.dp)
+                    .offset(
+                        x = (index - 1) * 100.dp,
+                        y = with(LocalDensity.current) { (offset * 50).dp }
+                    )
                     .background(
                         Color.White.copy(alpha = 0.1f),
                         shape = CircleShape
@@ -167,6 +169,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                     letterSpacing = 0.5.sp
                 )
             }
+        }
     }
 }
 
