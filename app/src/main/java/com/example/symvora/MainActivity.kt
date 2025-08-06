@@ -29,6 +29,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
 import com.example.symvora.ui.theme.SymvoraTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,8 +107,8 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 modifier = Modifier
                     .size(200.dp)
                     .offset(
-                        x = (index - 1) * 100.dp,
-                        y = 50.dp * offset
+                        x = (100 * (index - 1)).dp,
+                        y = (50 * offset).dp
                     )
                     .background(
                         Color.White.copy(alpha = 0.1f),
