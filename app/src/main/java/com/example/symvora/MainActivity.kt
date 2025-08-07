@@ -3,28 +3,6 @@ package com.example.symvora
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.ProvidableCompositionLocal
-
-data class AppColors(
-    val primary: Color,
-    val background: Color,
-    val surface: Color,
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val textTertiary: Color
-)
-
-val LocalAppColors: ProvidableCompositionLocal<AppColors> = staticCompositionLocalOf {
-    AppColors(
-        primary = Color(0xFF6C63FF),
-        background = Color.White,
-        surface = Color(0xFFF9F9F9),
-        textPrimary = Color(0xFF2E2E2E),
-        textSecondary = Color(0xFF666666),
-        textTertiary = Color(0xFF999999)
-    )
-}
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -42,6 +20,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +43,26 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+
+data class AppColors(
+    val primary: Color,
+    val background: Color,
+    val surface: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textTertiary: Color
+)
+
+val LocalAppColors: ProvidableCompositionLocal<AppColors> = staticCompositionLocalOf {
+    AppColors(
+        primary = Color(0xFF6C63FF),
+        background = Color.White,
+        surface = Color(0xFFF9F9F9),
+        textPrimary = Color(0xFF2E2E2E),
+        textSecondary = Color(0xFF666666),
+        textTertiary = Color(0xFF999999)
+    )
+}
 
 // Theme Configuration
 object ThemeConfig {
@@ -1176,12 +1176,6 @@ fun NavigationItem(
         Text(
             text = icon,
             fontSize = 24.sp
-        )
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isSelected) colors.primary else colors.textTertiary
         )
     }
 }
