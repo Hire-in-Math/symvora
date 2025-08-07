@@ -3,6 +3,28 @@ package com.example.symvora
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.ProvidableCompositionLocal
+
+data class AppColors(
+    val primary: Color,
+    val background: Color,
+    val surface: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textTertiary: Color
+)
+
+val LocalAppColors: ProvidableCompositionLocal<AppColors> = staticCompositionLocalOf {
+    AppColors(
+        primary = Color(0xFF6C63FF),
+        background = Color.White,
+        surface = Color(0xFFF9F9F9),
+        textPrimary = Color(0xFF2E2E2E),
+        textSecondary = Color(0xFF666666),
+        textTertiary = Color(0xFF999999)
+    )
+}
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -41,6 +63,38 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+
+// Theme Configuration
+object ThemeConfig {
+    var isDarkMode by mutableStateOf(false)
+        private set
+    
+    val colors: AppColors
+        @Composable
+        get() = if (isDarkMode) {
+            AppColors(
+                primary = Color(0xFF8B85FF),
+                background = Color(0xFF121212),
+                surface = Color(0xFF1E1E1E),
+                textPrimary = Color.White,
+                textSecondary = Color(0xFFB3B3B3),
+                textTertiary = Color(0xFF808080)
+            )
+        } else {
+            AppColors(
+                primary = Color(0xFF6C63FF),
+                background = Color.White,
+                surface = Color(0xFFF9F9F9),
+                textPrimary = Color(0xFF2E2E2E),
+                textSecondary = Color(0xFF666666),
+                textTertiary = Color(0xFF999999)
+            )
+        }
+
+    fun toggleTheme() {
+        isDarkMode = !isDarkMode
+    }
+}
 
 // Data model for symptom history
 data class SymptomHistoryEntry(
@@ -108,15 +162,43 @@ enum class Screen {
     Welcome, Symptoms, History, Settings
 }
 
+// Theme manager
+object ThemeManager {
+    var isDarkMode by mutableStateOf(false)
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SymvoraTheme {
-                var currentScreen by remember { mutableStateOf(Screen.Welcome) }
-                
-                Box(modifier = Modifier.fillMaxSize()) {
+            val isDarkMode = ThemeManager.isDarkMode
+            
+            val colors = if (isDarkMode) {
+                AppColors(
+                    primary = Color(0xFF8B85FF),
+                    background = Color(0xFF121212),
+                    surface = Color(0xFF1E1E1E),
+                    textPrimary = Color.White,
+                    textSecondary = Color(0xFFB3B3B3),
+                    textTertiary = Color(0xFF808080)
+                )
+            } else {
+                AppColors(
+                    primary = Color(0xFF6C63FF),
+                    background = Color.White,
+                    surface = Color(0xFFF9F9F9),
+                    textPrimary = Color(0xFF2E2E2E),
+                    textSecondary = Color(0xFF666666),
+                    textTertiary = Color(0xFF999999)
+                )
+            }
+            
+            CompositionLocalProvider(LocalAppColors provides colors) {
+                SymvoraTheme {
+                    var currentScreen by remember { mutableStateOf(Screen.Welcome) }
+                    
+                    Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
                     AnimatedVisibility(
                         visible = currentScreen == Screen.Welcome,
                         enter = fadeIn() + slideInVertically(),
@@ -426,11 +508,35 @@ fun HistoryEntryCard(
 @Composable
 fun SettingsScreen(onNavigate: (Screen) -> Unit) {
     val context = LocalContext.current
+    var isDarkMode by remember { mutableStateOf(ThemeManager.isDarkMode) }
+    var notificationsEnabled by remember { mutableStateOf(true) }
+    var languageSelection by remember { mutableStateOf("English") }
+    var fontSize by remember { mutableStateOf("Medium") }
+    
+    val colors = if (isDarkMode) {
+        AppColors(
+            primary = Color(0xFF8B85FF),
+            background = Color(0xFF121212),
+            surface = Color(0xFF1E1E1E),
+            textPrimary = Color.White,
+            textSecondary = Color(0xFFB3B3B3),
+            textTertiary = Color(0xFF808080)
+        )
+    } else {
+        AppColors(
+            primary = Color(0xFF6C63FF),
+            background = Color.White,
+            surface = Color(0xFFF9F9F9),
+            textPrimary = Color(0xFF2E2E2E),
+            textSecondary = Color(0xFF666666),
+            textTertiary = Color(0xFF999999)
+        )
+    }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colors.background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -438,11 +544,192 @@ fun SettingsScreen(onNavigate: (Screen) -> Unit) {
             text = "Settings",
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF2E2E2E),
+            color = colors.textPrimary,
             textAlign = TextAlign.Center,
             letterSpacing = (-0.5).sp,
             modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
         )
+
+        // Appearance Settings Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = colors.surface
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Appearance",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                // Dark Mode Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Dark Mode",
+                        fontSize = 14.sp,
+                        color = colors.textSecondary
+                    )
+                    Switch(
+                        checked = isDarkMode,
+                        onCheckedChange = { 
+                            isDarkMode = it
+                            ThemeManager.isDarkMode = it
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = colors.primary,
+                            checkedTrackColor = colors.primary.copy(alpha = 0.5f)
+                        )
+                    )
+                }
+                
+                // Font Size Selection
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "Font Size",
+                        fontSize = 14.sp,
+                        color = colors.textSecondary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf("Small", "Medium", "Large").forEach { size ->
+                            Text(
+                                text = size,
+                                fontSize = 14.sp,
+                                color = if (fontSize == size) colors.primary else colors.textSecondary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { fontSize = size }
+                                    .background(
+                                        if (fontSize == size) Color(0xFF6C63FF).copy(alpha = 0.1f)
+                                        else Color.Transparent
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Language and Region Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = colors.surface
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Language & Region",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Language",
+                        fontSize = 14.sp,
+                        color = colors.textSecondary
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable {
+                            Toast.makeText(context, "More languages coming soon!", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text(
+                            text = languageSelection,
+                            fontSize = 14.sp,
+                            color = colors.primary
+                        )
+                        Text(
+                            text = " ▼",
+                            fontSize = 12.sp,
+                            color = colors.primary
+                        )
+                    }
+                }
+            }
+        }
+
+        // Notifications Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = colors.surface
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Notifications",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Push Notifications",
+                            fontSize = 14.sp,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = "Get important updates and reminders",
+                            fontSize = 12.sp,
+                            color = colors.textTertiary
+                        )
+                    }
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { notificationsEnabled = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF6C63FF),
+                            checkedTrackColor = Color(0xFF6C63FF).copy(alpha = 0.5f)
+                        )
+                    )
+                }
+            }
+        }
 
         // App Version Card
         Card(
@@ -451,32 +738,7 @@ fun SettingsScreen(onNavigate: (Screen) -> Unit) {
                 .padding(bottom = 16.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFF9F9F9)
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "App Version",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF2E2E2E)
-                )
-                Text(
-                    text = "1.0.0",
-                    fontSize = 14.sp,
-                    color = Color(0xFF666666)
-                )
-            }
-        }
-
-        // Clear History Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFF9F9F9)
+                containerColor = colors.surface
             )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -484,7 +746,7 @@ fun SettingsScreen(onNavigate: (Screen) -> Unit) {
                     text = "Data Management",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF2E2E2E),
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 Button(
@@ -919,7 +1181,7 @@ fun NavigationItem(
             text = label,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            color = if (isSelected) Color(0xFF6C63FF) else Color(0xFF999999)
+            color = if (isSelected) colors.primary else colors.textTertiary
         )
     }
 }
