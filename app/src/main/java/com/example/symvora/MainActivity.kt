@@ -602,6 +602,7 @@ class MainActivity : ComponentActivity() {
         var confirmNewPassword by remember { mutableStateOf("") }
 
         val colors = ThemeManager.colors
+        val settingsScrollState = rememberScrollState()
 
         Column(
             modifier = Modifier
@@ -620,8 +621,15 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
             )
 
-            // Appearance Settings Card
-            Card(
+            // Scrollable content area
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(settingsScrollState)
+            ) {
+                // Appearance Settings Card
+                Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
@@ -629,199 +637,199 @@ class MainActivity : ComponentActivity() {
                 colors = CardDefaults.cardColors(
                     containerColor = colors.surface
                 )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Appearance",
-                        fontSize = scaledFontSize(16f).sp,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.textPrimary,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    // Dark Mode Toggle
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Dark Mode",
-                            fontSize = scaledFontSize(14f).sp,
-                            color = colors.textSecondary
+                            text = "Appearance",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
-                        Switch(
-                            checked = isDarkMode,
-                            onCheckedChange = { 
-                                ThemeManager.isDarkMode = it
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = colors.primary,
-                                checkedTrackColor = colors.primary.copy(alpha = 0.5f)
+
+                        // Dark Mode Toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Dark Mode",
+                                fontSize = scaledFontSize(14f).sp,
+                                color = colors.textSecondary
                             )
-                        )
-                    }
+                            Switch(
+                                checked = isDarkMode,
+                                onCheckedChange = { 
+                                    ThemeManager.isDarkMode = it
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.primary,
+                                    checkedTrackColor = colors.primary.copy(alpha = 0.5f)
+                                )
+                            )
+                        }
 
-                    // Font Size Selection
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                    ) {
+                        // Font Size Selection
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Font Size",
+                                fontSize = scaledFontSize(14f).sp,
+                                color = colors.textSecondary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                listOf("Small", "Medium", "Large").forEach { size ->
+                                    Text(
+                                        text = size,
+                                        fontSize = scaledFontSize(14f).sp,
+                                        color = if (fontSize == size) colors.primary else colors.textSecondary,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { FontSizeManager.fontSize = size }
+                                            .background(
+                                                if (fontSize == size) colors.primary.copy(alpha = 0.1f)
+                                                else Color.Transparent
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Language and Region Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = colors.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Font Size",
-                            fontSize = scaledFontSize(14f).sp,
-                            color = colors.textSecondary,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            text = "Language & Region",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            listOf("Small", "Medium", "Large").forEach { size ->
+                            Text(
+                                text = "Language",
+                                fontSize = scaledFontSize(14f).sp,
+                                color = colors.textSecondary
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable {
+                                    Toast.makeText(
+                                        context,
+                                        "More languages coming soon!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            ) {
                                 Text(
-                                    text = size,
+                                    text = languageSelection,
                                     fontSize = scaledFontSize(14f).sp,
-                                    color = if (fontSize == size) colors.primary else colors.textSecondary,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { FontSizeManager.fontSize = size }
-                                        .background(
-                                            if (fontSize == size) colors.primary.copy(alpha = 0.1f)
-                                            else Color.Transparent
-                                        )
-                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    color = colors.primary
+                                )
+                                Text(
+                                    text = " ▼",
+                                    fontSize = scaledFontSize(12f).sp,
+                                    color = colors.primary
                                 )
                             }
                         }
                     }
                 }
-            }
 
-            // Language and Region Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = colors.surface
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Language & Region",
-                        fontSize = scaledFontSize(16f).sp,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.textPrimary,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                // Notifications Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = colors.surface
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Language",
-                            fontSize = scaledFontSize(14f).sp,
-                            color = colors.textSecondary
+                            text = "Notifications",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(bottom = 12.dp)
                         )
+
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable {
-                                Toast.makeText(
-                                    context,
-                                    "More languages coming soon!",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = languageSelection,
-                                fontSize = scaledFontSize(14f).sp,
-                                color = colors.primary
-                            )
-                            Text(
-                                text = " ▼",
-                                fontSize = scaledFontSize(12f).sp,
-                                color = colors.primary
+                            Column {
+                                Text(
+                                    text = "Push Notifications",
+                                    fontSize = scaledFontSize(14f).sp,
+                                    color = colors.textSecondary
+                                )
+                                Text(
+                                    text = "Get important updates and reminders",
+                                    fontSize = scaledFontSize(12f).sp,
+                                    color = colors.textTertiary
+                                )
+                            }
+                            Switch(
+                                checked = notificationsEnabled,
+                                onCheckedChange = { notificationsEnabled = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = colors.primary,
+                                    checkedTrackColor = colors.primary.copy(alpha = 0.5f)
+                                )
                             )
                         }
                     }
                 }
-            }
 
-            // Notifications Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = colors.surface
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Notifications",
-                        fontSize = scaledFontSize(16f).sp,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.textPrimary,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                // Profile and Password Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = colors.surface
                     )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Push Notifications",
-                                fontSize = scaledFontSize(14f).sp,
-                                color = colors.textSecondary
-                            )
-                            Text(
-                                text = "Get important updates and reminders",
-                                fontSize = scaledFontSize(12f).sp,
-                                color = colors.textTertiary
-                            )
-                        }
-                        Switch(
-                            checked = notificationsEnabled,
-                            onCheckedChange = { notificationsEnabled = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = colors.primary,
-                                checkedTrackColor = colors.primary.copy(alpha = 0.5f)
-                            )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Profile",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
-                    }
-                }
-            }
-
-            // Profile and Password Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = colors.surface
-                )
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Profile",
-                        fontSize = scaledFontSize(16f).sp,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.textPrimary,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
 
                     OutlinedTextField(
                         value = editableName,
@@ -930,10 +938,11 @@ class MainActivity : ComponentActivity() {
                             fontWeight = FontWeight.Medium
                         )
                     }
+                    }
                 }
             }
 
-            Box(modifier = Modifier.weight(1f)) { }
+            // Spacer no longer needed due to scrollable content
 
             // Bottom Navigation
             Row(
@@ -1484,10 +1493,12 @@ class MainActivity : ComponentActivity() {
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
+                val responseScrollState = rememberScrollState()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
+                        .verticalScroll(responseScrollState)
                 ) {
                                     Text(
                     text = "AI Response",
@@ -1497,15 +1508,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                                    Text(
+                    Text(
                     text = resultText,
                     fontSize = scaledFontSize(14f).sp,
                     fontWeight = FontWeight.Light,
                     color = colors.textPrimary,
                     textAlign = TextAlign.Start,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        modifier = Modifier.fillMaxWidth()
                 )
                 }
             }
