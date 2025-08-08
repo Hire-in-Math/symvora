@@ -64,10 +64,13 @@ val LocalAppColors: ProvidableCompositionLocal<AppColors> = staticCompositionLoc
     )
 }
 
-// Theme Configuration
-object ThemeConfig {
+// Unified Theme Manager
+object ThemeManager {
     var isDarkMode by mutableStateOf(false)
-        private set
+    
+    fun toggleTheme() {
+        isDarkMode = !isDarkMode
+    }
     
     val colors: AppColors
         @Composable
@@ -90,10 +93,28 @@ object ThemeConfig {
                 textTertiary = Color(0xFF999999)
             )
         }
+}
 
-    fun toggleTheme() {
-        isDarkMode = !isDarkMode
+// Font Size Manager
+object FontSizeManager {
+    var fontSize by mutableStateOf("Medium")
+    
+    val scale: Float
+        get() = when (fontSize) {
+            "Small" -> 0.85f
+            "Large" -> 1.15f
+            else -> 1.0f // Medium
+        }
+    
+    fun getScaledSize(baseSize: Float): Float {
+        return baseSize * scale
     }
+}
+
+// Composable function to get scaled font size
+@Composable
+fun scaledFontSize(baseSize: Float): Float {
+    return FontSizeManager.getScaledSize(baseSize)
 }
 
 // Data model for symptom history
@@ -107,10 +128,15 @@ data class SymptomHistoryEntry(
 // Global history storage
 object SymptomHistoryManager {
     private val _history = mutableStateListOf<SymptomHistoryEntry>()
+    private var hasInitialized = false
     
-    init {
-        // Add some sample data for testing
-        addSampleData()
+    fun hasBeenInitialized(): Boolean = hasInitialized
+    
+    fun initializeWithSampleData() {
+        if (!hasInitialized) {
+            addSampleData()
+            hasInitialized = true
+        }
     }
     
     fun addEntry(entry: SymptomHistoryEntry) {
@@ -130,6 +156,14 @@ object SymptomHistoryManager {
     
     fun clearHistory() {
         _history.clear()
+        // Keep initialization flag true so sample data won't be re-added
+        // This ensures a true clear operation
+    }
+    
+    fun resetToInitialState() {
+        _history.clear()
+        hasInitialized = false
+        // This would allow sample data to be re-added if needed
     }
     
     // Expose the mutable state list for observation
@@ -159,12 +193,7 @@ object SymptomHistoryManager {
 }
 
 enum class Screen {
-    Welcome, Symptoms, History, Settings
-}
-
-// Theme manager
-object ThemeManager {
-    var isDarkMode by mutableStateOf(false)
+    Welcome, SignUp, Login, Symptoms, History, Settings
 }
 
 class MainActivity : ComponentActivity() {
@@ -172,30 +201,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val isDarkMode = ThemeManager.isDarkMode
-
-            val colors = if (isDarkMode) {
-                AppColors(
-                    primary = Color(0xFF8B85FF),
-                    background = Color(0xFF121212),
-                    surface = Color(0xFF1E1E1E),
-                    textPrimary = Color.White,
-                    textSecondary = Color(0xFFB3B3B3),
-                    textTertiary = Color(0xFF808080)
-                )
-            } else {
-                AppColors(
-                    primary = Color(0xFF6C63FF),
-                    background = Color.White,
-                    surface = Color(0xFFF9F9F9),
-                    textPrimary = Color(0xFF2E2E2E),
-                    textSecondary = Color(0xFF666666),
-                    textTertiary = Color(0xFF999999)
-                )
-            }
+            val colors = ThemeManager.colors
 
             CompositionLocalProvider(LocalAppColors provides colors) {
-                SymvoraTheme {
+                SymvoraTheme(darkTheme = ThemeManager.isDarkMode) {
                     var currentScreen by remember { mutableStateOf(Screen.Welcome) }
 
                     Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
@@ -204,7 +213,10 @@ class MainActivity : ComponentActivity() {
                             enter = fadeIn() + slideInVertically(),
                             exit = fadeOut() + slideOutVertically()
                         ) {
-                            WelcomeScreen(onContinue = { currentScreen = Screen.Symptoms })
+                            WelcomeScreen(
+                                onContinue = { currentScreen = Screen.SignUp },
+                                onLogin = { currentScreen = Screen.Login }
+                            )
                         }
 
                         AnimatedVisibility(
@@ -213,6 +225,13 @@ class MainActivity : ComponentActivity() {
                             exit = fadeOut() + slideOutVertically()
                         ) {
                             when (currentScreen) {
+                                Screen.SignUp -> SignUpScreen(onNavigate = { screen ->
+                                    currentScreen = screen
+                                })
+
+                                Screen.Login -> LoginScreen(onNavigate = { screen ->
+                                    currentScreen = screen
+                                })
                                 Screen.Symptoms -> SymptomCheckerApp(
                                     currentScreen = currentScreen,
                                     onScreenChange = { screen -> currentScreen = screen }
@@ -246,24 +265,22 @@ class MainActivity : ComponentActivity() {
         }
         val dateFormat =
             remember { SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault()) }
+        val colors = LocalAppColors.current
 
-        // Ensure sample data is loaded
+        // Ensure sample data is loaded only once on app start
         LaunchedEffect(Unit) {
-            if (SymptomHistoryManager.getAllEntries().isEmpty()) {
-                // Add sample data if empty
-                SymptomHistoryManager.addEntry(
-                    SymptomHistoryEntry(
-                        symptoms = "Sample headache and fever",
-                        aiResponse = "This is a sample AI response for testing the history feature."
-                    )
-                )
+            // Only add sample data if this is the first time the app is running
+            // and there are no entries at all (not just empty from clearing)
+            if (SymptomHistoryManager.getAllEntries().isEmpty() && 
+                !SymptomHistoryManager.hasBeenInitialized()) {
+                SymptomHistoryManager.initializeWithSampleData()
             }
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(colors.background)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -276,18 +293,18 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text(
                     text = "Symptom History",
-                    fontSize = 26.sp,
+                    fontSize = scaledFontSize(26f).sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2E2E2E),
+                    color = colors.textPrimary,
                     letterSpacing = (-0.5).sp
                 )
-                Text(
-                    text = if (searchQuery.isBlank())
-                        "${historyEntries.size} entries (${SymptomHistoryManager.getAllEntries().size} total)"
-                    else
+                                Text(
+                    text = if (searchQuery.isBlank()) 
+                        "${historyEntries.size} entries (${SymptomHistoryManager.getAllEntries().size} total)" 
+                    else 
                         "${historyEntries.size} found",
-                    fontSize = 12.sp,
-                    color = Color(0xFF666666),
+                    fontSize = scaledFontSize(12f).sp,
+                    color = colors.textSecondary,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -299,7 +316,7 @@ class MainActivity : ComponentActivity() {
                     .padding(bottom = 16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF9F9F9)
+                    containerColor = colors.surface
                 )
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
@@ -310,19 +327,19 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .padding(bottom = 8.dp),
                         placeholder = {
-                            Text(
-                                text = "Search previous symptoms...",
-                                fontSize = 14.sp,
-                                color = Color(0xFF999999)
-                            )
+                                                    Text(
+                            text = "Search previous symptoms...",
+                            fontSize = scaledFontSize(14f).sp,
+                            color = colors.textTertiary
+                        )
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF6C63FF),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF6C63FF),
-                            unfocusedLabelColor = Color(0xFF999999)
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.textTertiary
                         )
                     )
 
@@ -339,13 +356,13 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF6C63FF),
+                            containerColor = colors.primary,
                             contentColor = Color.White
                         )
                     ) {
                         Text(
                             text = "Add Test Entry (Debug)",
-                            fontSize = 12.sp,
+                            fontSize = scaledFontSize(12f).sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -365,22 +382,22 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = if (searchQuery.isBlank()) "No history yet" else "No matching entries found",
-                            fontSize = 16.sp,
-                            color = Color(0xFF666666),
+                            fontSize = scaledFontSize(16f).sp,
+                            color = colors.textSecondary,
                             textAlign = TextAlign.Center
                         )
                         Text(
                             text = if (searchQuery.isBlank()) "Your symptom checks will appear here" else "Try a different search term",
-                            fontSize = 14.sp,
-                            color = Color(0xFF999999),
+                            fontSize = scaledFontSize(14f).sp,
+                            color = colors.textTertiary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         // Debug information
                         Text(
                             text = "Debug: Total entries = ${SymptomHistoryManager.getAllEntries().size}",
-                            fontSize = 12.sp,
-                            color = Color(0xFF999999),
+                            fontSize = scaledFontSize(12f).sp,
+                            color = colors.textTertiary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 16.dp)
                         )
@@ -402,7 +419,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF9F9F9),
+                        color = colors.surface,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .padding(16.dp),
@@ -437,6 +454,7 @@ class MainActivity : ComponentActivity() {
         dateFormat: SimpleDateFormat
     ) {
         var isExpanded by remember { mutableStateOf(false) }
+        val colors = LocalAppColors.current
 
         Card(
             modifier = Modifier
@@ -444,7 +462,7 @@ class MainActivity : ComponentActivity() {
                 .clickable { isExpanded = !isExpanded },
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color.White
+                containerColor = colors.surface
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
@@ -459,14 +477,14 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Text(
                         text = dateFormat.format(Date(entry.timestamp)),
-                        fontSize = 12.sp,
-                        color = Color(0xFF666666),
+                        fontSize = scaledFontSize(12f).sp,
+                        color = colors.textSecondary,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = if (isExpanded) "▼" else "▶",
-                        fontSize = 14.sp,
-                        color = Color(0xFF6C63FF),
+                        fontSize = scaledFontSize(14f).sp,
+                        color = colors.primary,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -474,8 +492,8 @@ class MainActivity : ComponentActivity() {
                 // Symptoms preview
                 Text(
                     text = entry.symptoms,
-                    fontSize = 14.sp,
-                    color = Color(0xFF2E2E2E),
+                    fontSize = scaledFontSize(14f).sp,
+                    color = colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(top = 8.dp),
                     maxLines = if (isExpanded) Int.MAX_VALUE else 2
@@ -492,20 +510,20 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Divider(
                             modifier = Modifier.padding(vertical = 8.dp),
-                            color = Color(0xFFE0E0E0)
+                            color = colors.textTertiary.copy(alpha = 0.3f)
                         )
                         Text(
                             text = "AI Analysis:",
-                            fontSize = 12.sp,
-                            color = Color(0xFF6C63FF),
+                            fontSize = scaledFontSize(12f).sp,
+                            color = colors.primary,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                         Text(
                             text = entry.aiResponse,
-                            fontSize = 13.sp,
-                            color = Color(0xFF2E2E2E),
-                            lineHeight = 18.sp
+                            fontSize = scaledFontSize(13f).sp,
+                            color = colors.textPrimary,
+                            lineHeight = (scaledFontSize(18f)).sp
                         )
                     }
                 }
@@ -516,30 +534,12 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SettingsScreen(onNavigate: (Screen) -> Unit) {
         val context = LocalContext.current
-        var isDarkMode by remember { mutableStateOf(ThemeManager.isDarkMode) }
+        val isDarkMode by remember { derivedStateOf { ThemeManager.isDarkMode } }
         var notificationsEnabled by remember { mutableStateOf(true) }
         var languageSelection by remember { mutableStateOf("English") }
-        var fontSize by remember { mutableStateOf("Medium") }
+        val fontSize by remember { derivedStateOf { FontSizeManager.fontSize } }
 
-        val colors = if (isDarkMode) {
-            AppColors(
-                primary = Color(0xFF8B85FF),
-                background = Color(0xFF121212),
-                surface = Color(0xFF1E1E1E),
-                textPrimary = Color.White,
-                textSecondary = Color(0xFFB3B3B3),
-                textTertiary = Color(0xFF808080)
-            )
-        } else {
-            AppColors(
-                primary = Color(0xFF6C63FF),
-                background = Color.White,
-                surface = Color(0xFFF9F9F9),
-                textPrimary = Color(0xFF2E2E2E),
-                textSecondary = Color(0xFF666666),
-                textTertiary = Color(0xFF999999)
-            )
-        }
+        val colors = ThemeManager.colors
 
         Column(
             modifier = Modifier
@@ -550,7 +550,7 @@ class MainActivity : ComponentActivity() {
         ) {
             Text(
                 text = "Settings",
-                fontSize = 26.sp,
+                fontSize = scaledFontSize(26f).sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
                 textAlign = TextAlign.Center,
@@ -571,7 +571,7 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Appearance",
-                        fontSize = 16.sp,
+                        fontSize = scaledFontSize(16f).sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -587,13 +587,12 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Dark Mode",
-                            fontSize = 14.sp,
+                            fontSize = scaledFontSize(14f).sp,
                             color = colors.textSecondary
                         )
                         Switch(
                             checked = isDarkMode,
-                            onCheckedChange = {
-                                isDarkMode = it
+                            onCheckedChange = { 
                                 ThemeManager.isDarkMode = it
                             },
                             colors = SwitchDefaults.colors(
@@ -611,7 +610,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Font Size",
-                            fontSize = 14.sp,
+                            fontSize = scaledFontSize(14f).sp,
                             color = colors.textSecondary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -622,13 +621,13 @@ class MainActivity : ComponentActivity() {
                             listOf("Small", "Medium", "Large").forEach { size ->
                                 Text(
                                     text = size,
-                                    fontSize = 14.sp,
+                                    fontSize = scaledFontSize(14f).sp,
                                     color = if (fontSize == size) colors.primary else colors.textSecondary,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable { fontSize = size }
+                                        .clickable { FontSizeManager.fontSize = size }
                                         .background(
-                                            if (fontSize == size) Color(0xFF6C63FF).copy(alpha = 0.1f)
+                                            if (fontSize == size) colors.primary.copy(alpha = 0.1f)
                                             else Color.Transparent
                                         )
                                         .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -652,7 +651,7 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Language & Region",
-                        fontSize = 16.sp,
+                        fontSize = scaledFontSize(16f).sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -665,7 +664,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Language",
-                            fontSize = 14.sp,
+                            fontSize = scaledFontSize(14f).sp,
                             color = colors.textSecondary
                         )
                         Row(
@@ -680,12 +679,12 @@ class MainActivity : ComponentActivity() {
                         ) {
                             Text(
                                 text = languageSelection,
-                                fontSize = 14.sp,
+                                fontSize = scaledFontSize(14f).sp,
                                 color = colors.primary
                             )
                             Text(
                                 text = " ▼",
-                                fontSize = 12.sp,
+                                fontSize = scaledFontSize(12f).sp,
                                 color = colors.primary
                             )
                         }
@@ -706,7 +705,7 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Notifications",
-                        fontSize = 16.sp,
+                        fontSize = scaledFontSize(16f).sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -722,12 +721,12 @@ class MainActivity : ComponentActivity() {
                         Column {
                             Text(
                                 text = "Push Notifications",
-                                fontSize = 14.sp,
+                                fontSize = scaledFontSize(14f).sp,
                                 color = colors.textSecondary
                             )
                             Text(
                                 text = "Get important updates and reminders",
-                                fontSize = 12.sp,
+                                fontSize = scaledFontSize(12f).sp,
                                 color = colors.textTertiary
                             )
                         }
@@ -735,8 +734,8 @@ class MainActivity : ComponentActivity() {
                             checked = notificationsEnabled,
                             onCheckedChange = { notificationsEnabled = it },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color(0xFF6C63FF),
-                                checkedTrackColor = Color(0xFF6C63FF).copy(alpha = 0.5f)
+                                checkedThumbColor = colors.primary,
+                                checkedTrackColor = colors.primary.copy(alpha = 0.5f)
                             )
                         )
                     }
@@ -756,7 +755,7 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Data Management",
-                        fontSize = 16.sp,
+                        fontSize = scaledFontSize(16f).sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -779,7 +778,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Clear Symptom History",
-                            fontSize = 14.sp,
+                            fontSize = scaledFontSize(14f).sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -793,7 +792,7 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF9F9F9),
+                        color = colors.surface,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .padding(16.dp),
@@ -823,7 +822,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun WelcomeScreen(onContinue: () -> Unit) {
+    fun WelcomeScreen(onContinue: () -> Unit, onLogin: () -> Unit) {
         var isAnimated by remember { mutableStateOf(false) }
         val scale by animateFloatAsState(
             targetValue = if (isAnimated) 1f else 0.8f,
@@ -876,24 +875,24 @@ class MainActivity : ComponentActivity() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "Welcome to Symvora!",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                    letterSpacing = (-1).sp
-                )
-
-                Text(
-                    text = "Your AI-powered symptom checker.",
-                    fontSize = 18.sp,
-                    color = Color.White.copy(alpha = 0.9f),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Normal,
-                    letterSpacing = 0.sp,
-                    modifier = Modifier.padding(bottom = 48.dp, start = 32.dp, end = 32.dp)
-                )
+                            Text(
+                text = "Welcome to Symvora!",
+                fontSize = scaledFontSize(36f).sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 16.dp),
+                letterSpacing = (-1).sp
+            )
+            
+            Text(
+                text = "Your AI-powered symptom checker.",
+                fontSize = scaledFontSize(18f).sp,
+                color = Color.White.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Normal,
+                letterSpacing = 0.sp,
+                modifier = Modifier.padding(bottom = 48.dp, start = 32.dp, end = 32.dp)
+            )
 
                 Button(
                     onClick = onContinue,
@@ -916,15 +915,253 @@ class MainActivity : ComponentActivity() {
                         pressedElevation = 2.dp
                     )
                 ) {
-                    Text(
-                        text = "Get Started",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF6C63FF),
-                        letterSpacing = 0.5.sp
+                                    Text(
+                    text = "Get Started",
+                    fontSize = scaledFontSize(17f).sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF6C63FF),
+                    letterSpacing = 0.5.sp
+                )
+                }
+
+                // Login link
+                Text(
+                    text = "Already have an account? Log in",
+                    color = Color.White,
+                    fontSize = scaledFontSize(14f).sp,
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .clickable { onLogin() }
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun SignUpScreen(onNavigate: (Screen) -> Unit) {
+        val colors = LocalAppColors.current
+        val context = LocalContext.current
+
+        var name by remember { mutableStateOf("") }
+        var email by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+        var confirmPassword by remember { mutableStateOf("") }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Create your account",
+                fontSize = scaledFontSize(26f).sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
+                modifier = Modifier.padding(top = 24.dp, bottom = 24.dp)
+            )
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Full Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
                     )
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Email") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        label = { Text("Confirm Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    Button(
+                        onClick = {
+                            val isEmailValid = email.contains("@") && email.contains(".")
+                            when {
+                                name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() ->
+                                    Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                                !isEmailValid -> Toast.makeText(context, "Enter a valid email", Toast.LENGTH_SHORT).show()
+                                password.length < 6 -> Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
+                                password != confirmPassword -> Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                                else -> {
+                                    Toast.makeText(context, "Account created!", Toast.LENGTH_SHORT).show()
+                                    onNavigate(Screen.Symptoms)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
+                    ) {
+                        Text(
+                            text = "Create Account",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
+
+            Text(
+                text = "Already have an account? Log in",
+                color = colors.primary,
+                fontSize = scaledFontSize(14f).sp,
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .clickable { onNavigate(Screen.Login) }
+            )
+
+            Text(
+                text = "Skip for now",
+                color = colors.textSecondary,
+                fontSize = scaledFontSize(12f).sp,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { onNavigate(Screen.Symptoms) }
+            )
+        }
+    }
+
+    @Composable
+    fun LoginScreen(onNavigate: (Screen) -> Unit) {
+        val colors = LocalAppColors.current
+        val context = LocalContext.current
+
+        var email by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome back",
+                fontSize = scaledFontSize(26f).sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
+                modifier = Modifier.padding(top = 24.dp, bottom = 24.dp)
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Email") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        label = { Text("Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    Button(
+                        onClick = {
+                            val isEmailValid = email.contains("@") && email.contains(".")
+                            when {
+                                email.isBlank() || password.isBlank() ->
+                                    Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
+                                !isEmailValid -> Toast.makeText(context, "Enter a valid email", Toast.LENGTH_SHORT).show()
+                                else -> {
+                                    Toast.makeText(context, "Logged in!", Toast.LENGTH_SHORT).show()
+                                    onNavigate(Screen.Symptoms)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
+                    ) {
+                        Text(
+                            text = "Log In",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Don't have an account? Sign up",
+                color = colors.primary,
+                fontSize = scaledFontSize(14f).sp,
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .clickable { onNavigate(Screen.SignUp) }
+            )
+
+            Text(
+                text = "Skip for now",
+                color = colors.textSecondary,
+                fontSize = scaledFontSize(12f).sp,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { onNavigate(Screen.Symptoms) }
+            )
         }
     }
 
@@ -937,24 +1174,25 @@ class MainActivity : ComponentActivity() {
         var resultText by remember { mutableStateOf("AI Response will appear here...") }
         var isLoading by remember { mutableStateOf(false) }
         val context = LocalContext.current
+        val colors = LocalAppColors.current
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(colors.background)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Top Header Bar
-            Text(
-                text = "Symptom Checker AI",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF2E2E2E),
-                textAlign = TextAlign.Center,
-                letterSpacing = (-0.5).sp,
-                modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
-            )
+                    // 1. Top Header Bar
+        Text(
+            text = "Symptom Checker AI",
+            fontSize = scaledFontSize(26f).sp,
+            fontWeight = FontWeight.Bold,
+            color = colors.textPrimary,
+            textAlign = TextAlign.Center,
+            letterSpacing = (-0.5).sp,
+            modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
+        )
 
             // 2. Input Card
             Card(
@@ -963,20 +1201,20 @@ class MainActivity : ComponentActivity() {
                     .padding(bottom = 24.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF9F9F9)
+                    containerColor = colors.surface
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
-                        text = "Describe your symptoms",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF2E2E2E),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                                    Text(
+                    text = "Describe your symptoms",
+                    fontSize = scaledFontSize(16f).sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
 
                     OutlinedTextField(
                         value = symptomText,
@@ -985,17 +1223,17 @@ class MainActivity : ComponentActivity() {
                             .fillMaxWidth()
                             .height(120.dp),
                         shape = RoundedCornerShape(12.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(
-                            fontSize = 14.sp,
-                            color = Color(0xFF2E2E2E)
-                        ),
+                                            textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = scaledFontSize(14f).sp,
+                        color = colors.textPrimary
+                    ),
                         minLines = 4,
                         maxLines = 6,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF6C63FF),
+                            focusedBorderColor = colors.primary,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF6C63FF),
-                            unfocusedLabelColor = Color(0xFF999999)
+                            focusedLabelColor = colors.primary,
+                            unfocusedLabelColor = colors.textTertiary
                         )
                     )
                 }
@@ -1059,14 +1297,14 @@ class MainActivity : ComponentActivity() {
                         .shadow(
                             elevation = 4.dp,
                             shape = RoundedCornerShape(16.dp),
-                            spotColor = Color(0xFF6C63FF).copy(alpha = 0.25f)
+                            spotColor = colors.primary.copy(alpha = 0.25f)
                         ),
                     enabled = symptomText.isNotBlank() && !isLoading,
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF6C63FF),
+                        containerColor = colors.primary,
                         contentColor = Color.White,
-                        disabledContainerColor = Color(0xFF6C63FF).copy(alpha = 0.6f),
+                        disabledContainerColor = colors.primary.copy(alpha = 0.6f),
                         disabledContentColor = Color.White.copy(alpha = 0.6f)
                     )
                 ) {
@@ -1077,13 +1315,13 @@ class MainActivity : ComponentActivity() {
                             strokeWidth = 2.dp
                         )
                     } else {
-                        Text(
-                            text = "Analyze Symptoms",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 0.5.sp,
-                            color = Color.White
-                        )
+                                            Text(
+                        text = "Analyze Symptoms",
+                        fontSize = scaledFontSize(17f).sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp,
+                        color = Color.White
+                    )
                     }
                 }
             }
@@ -1096,7 +1334,7 @@ class MainActivity : ComponentActivity() {
                     .padding(bottom = 16.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = colors.surface
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
@@ -1105,43 +1343,43 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .padding(16.dp)
                 ) {
-                    Text(
-                        text = "AI Response",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF2E2E2E),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
+                                    Text(
+                    text = "AI Response",
+                    fontSize = scaledFontSize(16f).sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
 
-                    Text(
-                        text = resultText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Light,
-                        color = Color(0xFF2E2E2E),
-                        textAlign = TextAlign.Start,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                    )
+                                    Text(
+                    text = resultText,
+                    fontSize = scaledFontSize(14f).sp,
+                    fontWeight = FontWeight.Light,
+                    color = colors.textPrimary,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                )
                 }
             }
 
-            // 5. Subtle Disclaimer
-            Text(
-                text = "Disclaimer: This app is not a medical diagnosis tool. Always consult a healthcare professional.",
-                fontSize = 11.sp,
-                color = Color(0xFF999999),
-                textAlign = TextAlign.Center,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+                    // 5. Subtle Disclaimer
+        Text(
+            text = "Disclaimer: This app is not a medical diagnosis tool. Always consult a healthcare professional.",
+            fontSize = scaledFontSize(11f).sp,
+            color = colors.textTertiary,
+            textAlign = TextAlign.Center,
+            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
 
             // 6. Bottom Navigation (Optional Enhancement)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF9F9F9),
+                        color = colors.surface,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .padding(16.dp),
@@ -1186,6 +1424,7 @@ class MainActivity : ComponentActivity() {
                 stiffness = Spring.StiffnessLow
             )
         )
+        val colors = LocalAppColors.current
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1193,15 +1432,16 @@ class MainActivity : ComponentActivity() {
                 .clickable(onClick = onClick)
                 .scale(scale)
         ) {
-            Text(
-                text = icon,
-                fontSize = 24.sp
-            )
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = if (isSelected) Color(0xFF6C63FF) else Color(0xFF999999)
-            )
+                    Text(
+            text = icon,
+            fontSize = scaledFontSize(24f).sp
+        )
+        Text(
+            text = label,
+            fontSize = scaledFontSize(12f).sp,
+            fontWeight = FontWeight.Medium,
+            color = if (isSelected) colors.primary else colors.textTertiary
+        )
         }
     }
 
@@ -1215,4 +1455,5 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
+
 }
