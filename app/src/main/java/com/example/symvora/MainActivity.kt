@@ -193,7 +193,7 @@ object SymptomHistoryManager {
 }
 
 enum class Screen {
-    Welcome, Symptoms, History, Settings
+    Welcome, SignUp, Login, Symptoms, History, Settings
 }
 
 class MainActivity : ComponentActivity() {
@@ -213,7 +213,10 @@ class MainActivity : ComponentActivity() {
                             enter = fadeIn() + slideInVertically(),
                             exit = fadeOut() + slideOutVertically()
                         ) {
-                            WelcomeScreen(onContinue = { currentScreen = Screen.Symptoms })
+                            WelcomeScreen(
+                                onContinue = { currentScreen = Screen.SignUp },
+                                onLogin = { currentScreen = Screen.Login }
+                            )
                         }
 
                         AnimatedVisibility(
@@ -222,6 +225,13 @@ class MainActivity : ComponentActivity() {
                             exit = fadeOut() + slideOutVertically()
                         ) {
                             when (currentScreen) {
+                                Screen.SignUp -> SignUpScreen(onNavigate = { screen ->
+                                    currentScreen = screen
+                                })
+
+                                Screen.Login -> LoginScreen(onNavigate = { screen ->
+                                    currentScreen = screen
+                                })
                                 Screen.Symptoms -> SymptomCheckerApp(
                                     currentScreen = currentScreen,
                                     onScreenChange = { screen -> currentScreen = screen }
@@ -812,7 +822,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun WelcomeScreen(onContinue: () -> Unit) {
+    fun WelcomeScreen(onContinue: () -> Unit, onLogin: () -> Unit) {
         var isAnimated by remember { mutableStateOf(false) }
         val scale by animateFloatAsState(
             targetValue = if (isAnimated) 1f else 0.8f,
@@ -913,7 +923,245 @@ class MainActivity : ComponentActivity() {
                     letterSpacing = 0.5.sp
                 )
                 }
+
+                // Login link
+                Text(
+                    text = "Already have an account? Log in",
+                    color = Color.White,
+                    fontSize = scaledFontSize(14f).sp,
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .clickable { onLogin() }
+                )
             }
+        }
+    }
+
+    @Composable
+    fun SignUpScreen(onNavigate: (Screen) -> Unit) {
+        val colors = LocalAppColors.current
+        val context = LocalContext.current
+
+        var name by remember { mutableStateOf("") }
+        var email by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+        var confirmPassword by remember { mutableStateOf("") }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Create your account",
+                fontSize = scaledFontSize(26f).sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
+                modifier = Modifier.padding(top = 24.dp, bottom = 24.dp)
+            )
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Full Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Email") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        label = { Text("Confirm Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    Button(
+                        onClick = {
+                            val isEmailValid = email.contains("@") && email.contains(".")
+                            when {
+                                name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() ->
+                                    Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                                !isEmailValid -> Toast.makeText(context, "Enter a valid email", Toast.LENGTH_SHORT).show()
+                                password.length < 6 -> Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
+                                password != confirmPassword -> Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                                else -> {
+                                    Toast.makeText(context, "Account created!", Toast.LENGTH_SHORT).show()
+                                    onNavigate(Screen.Symptoms)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
+                    ) {
+                        Text(
+                            text = "Create Account",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Already have an account? Log in",
+                color = colors.primary,
+                fontSize = scaledFontSize(14f).sp,
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .clickable { onNavigate(Screen.Login) }
+            )
+
+            Text(
+                text = "Skip for now",
+                color = colors.textSecondary,
+                fontSize = scaledFontSize(12f).sp,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { onNavigate(Screen.Symptoms) }
+            )
+        }
+    }
+
+    @Composable
+    fun LoginScreen(onNavigate: (Screen) -> Unit) {
+        val colors = LocalAppColors.current
+        val context = LocalContext.current
+
+        var email by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome back",
+                fontSize = scaledFontSize(26f).sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
+                modifier = Modifier.padding(top = 24.dp, bottom = 24.dp)
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Email") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        label = { Text("Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    Button(
+                        onClick = {
+                            val isEmailValid = email.contains("@") && email.contains(".")
+                            when {
+                                email.isBlank() || password.isBlank() ->
+                                    Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
+                                !isEmailValid -> Toast.makeText(context, "Enter a valid email", Toast.LENGTH_SHORT).show()
+                                else -> {
+                                    Toast.makeText(context, "Logged in!", Toast.LENGTH_SHORT).show()
+                                    onNavigate(Screen.Symptoms)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
+                    ) {
+                        Text(
+                            text = "Log In",
+                            fontSize = scaledFontSize(16f).sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Don't have an account? Sign up",
+                color = colors.primary,
+                fontSize = scaledFontSize(14f).sp,
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .clickable { onNavigate(Screen.SignUp) }
+            )
+
+            Text(
+                text = "Skip for now",
+                color = colors.textSecondary,
+                fontSize = scaledFontSize(12f).sp,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { onNavigate(Screen.Symptoms) }
+            )
         }
     }
 
