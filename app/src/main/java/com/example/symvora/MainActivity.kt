@@ -95,6 +95,52 @@ object ThemeManager {
         }
 }
 
+// Simple in-memory user management
+data class User(
+    val email: String,
+    var name: String,
+    var password: String
+)
+
+object UserManager {
+    var currentUser by mutableStateOf<User?>(null)
+
+    val isAuthenticated: Boolean
+        get() = currentUser != null
+
+    fun signUp(name: String, email: String, password: String): Boolean {
+        currentUser = User(email = email, name = name, password = password)
+        return true
+    }
+
+    fun login(email: String, password: String): Boolean {
+        // For demo purposes: allow login if email matches and password matches current user
+        // If there is no current user yet, allow login to create a session with provided creds
+        val existing = currentUser
+        return if (existing == null) {
+            // Create a temporary user with unknown name
+            currentUser = User(email = email, name = email.substringBefore("@"), password = password)
+            true
+        } else if (existing.email.equals(email, ignoreCase = true) && existing.password == password) {
+            true
+        } else {
+            false
+        }
+    }
+
+    fun updateName(newName: String) {
+        currentUser?.let { user ->
+            currentUser = user.copy(name = newName)
+        }
+    }
+
+    fun updatePassword(newPassword: String) {
+        currentUser?.let { user ->
+            currentUser = user.copy(password = newPassword)
+        }
+    }
+}
+
 // Font Size Manager
 object FontSizeManager {
     var fontSize by mutableStateOf("Medium")
@@ -206,6 +252,18 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalAppColors provides colors) {
                 SymvoraTheme(darkTheme = ThemeManager.isDarkMode) {
                     var currentScreen by remember { mutableStateOf(Screen.Welcome) }
+                    val isAuthenticated by remember { derivedStateOf { UserManager.isAuthenticated } }
+
+                    // Enforce authentication gating
+                    LaunchedEffect(isAuthenticated, currentScreen) {
+                        if (!isAuthenticated && (currentScreen == Screen.Symptoms || currentScreen == Screen.History || currentScreen == Screen.Settings)) {
+                            currentScreen = Screen.SignUp
+                        }
+                        if (isAuthenticated && (currentScreen == Screen.Welcome || currentScreen == Screen.SignUp || currentScreen == Screen.Login)) {
+                            // After auth, land on Symptoms
+                            currentScreen = Screen.Symptoms
+                        }
+                    }
 
                     Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
                         AnimatedVisibility(
@@ -538,6 +596,10 @@ class MainActivity : ComponentActivity() {
         var notificationsEnabled by remember { mutableStateOf(true) }
         var languageSelection by remember { mutableStateOf("English") }
         val fontSize by remember { derivedStateOf { FontSizeManager.fontSize } }
+        var editableName by remember { mutableStateOf(UserManager.currentUser?.name ?: "") }
+        var currentPassword by remember { mutableStateOf("") }
+        var newPassword by remember { mutableStateOf("") }
+        var confirmNewPassword by remember { mutableStateOf("") }
 
         val colors = ThemeManager.colors
 
@@ -742,7 +804,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // App Version Card
+            // Profile and Password Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -754,30 +816,116 @@ class MainActivity : ComponentActivity() {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Data Management",
+                        text = "Profile",
                         fontSize = scaledFontSize(16f).sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
+
+                    OutlinedTextField(
+                        value = editableName,
+                        onValueChange = { editableName = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Full Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
                     Button(
                         onClick = {
-                            SymptomHistoryManager.clearHistory()
-                            Toast.makeText(
-                                context,
-                                "History cleared successfully",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            if (editableName.isBlank()) {
+                                Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                            } else {
+                                UserManager.updateName(editableName)
+                                Toast.makeText(context, "Name updated", Toast.LENGTH_SHORT).show()
+                            }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF6B6B),
-                            contentColor = Color.White
-                        )
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .padding(bottom = 12.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
                     ) {
                         Text(
-                            text = "Clear Symptom History",
+                            text = "Save Name",
+                            fontSize = scaledFontSize(14f).sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Text(
+                        text = "Change Password",
+                        fontSize = scaledFontSize(14f).sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.textPrimary,
+                        modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = currentPassword,
+                        onValueChange = { currentPassword = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        label = { Text("Current Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        label = { Text("New Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    OutlinedTextField(
+                        value = confirmNewPassword,
+                        onValueChange = { confirmNewPassword = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        label = { Text("Confirm New Password") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                    )
+
+                    Button(
+                        onClick = {
+                            val user = UserManager.currentUser
+                            when {
+                                user == null -> Toast.makeText(context, "Not authenticated", Toast.LENGTH_SHORT).show()
+                                currentPassword != user.password -> Toast.makeText(context, "Current password is incorrect", Toast.LENGTH_SHORT).show()
+                                newPassword.length < 6 -> Toast.makeText(context, "New password must be at least 6 characters", Toast.LENGTH_SHORT).show()
+                                newPassword != confirmNewPassword -> Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                                else -> {
+                                    UserManager.updatePassword(newPassword)
+                                    currentPassword = ""
+                                    newPassword = ""
+                                    confirmNewPassword = ""
+                                    Toast.makeText(context, "Password updated", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
+                    ) {
+                        Text(
+                            text = "Save Password",
                             fontSize = scaledFontSize(14f).sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -1025,6 +1173,7 @@ class MainActivity : ComponentActivity() {
                                 password.length < 6 -> Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
                                 password != confirmPassword -> Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
                                 else -> {
+                                    UserManager.signUp(name = name, email = email, password = password)
                                     Toast.makeText(context, "Account created!", Toast.LENGTH_SHORT).show()
                                     onNavigate(Screen.Symptoms)
                                 }
@@ -1052,15 +1201,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier
                     .padding(top = 16.dp)
                     .clickable { onNavigate(Screen.Login) }
-            )
-
-            Text(
-                text = "Skip for now",
-                color = colors.textSecondary,
-                fontSize = scaledFontSize(12f).sp,
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .clickable { onNavigate(Screen.Symptoms) }
             )
         }
     }
@@ -1125,8 +1265,13 @@ class MainActivity : ComponentActivity() {
                                     Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
                                 !isEmailValid -> Toast.makeText(context, "Enter a valid email", Toast.LENGTH_SHORT).show()
                                 else -> {
-                                    Toast.makeText(context, "Logged in!", Toast.LENGTH_SHORT).show()
-                                    onNavigate(Screen.Symptoms)
+                                    val success = UserManager.login(email = email, password = password)
+                                    if (success) {
+                                        Toast.makeText(context, "Logged in!", Toast.LENGTH_SHORT).show()
+                                        onNavigate(Screen.Symptoms)
+                                    } else {
+                                        Toast.makeText(context, "Invalid credentials", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         },
@@ -1153,15 +1298,6 @@ class MainActivity : ComponentActivity() {
                     .padding(top = 16.dp)
                     .clickable { onNavigate(Screen.SignUp) }
             )
-
-            Text(
-                text = "Skip for now",
-                color = colors.textSecondary,
-                fontSize = scaledFontSize(12f).sp,
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .clickable { onNavigate(Screen.Symptoms) }
-            )
         }
     }
 
@@ -1175,6 +1311,7 @@ class MainActivity : ComponentActivity() {
         var isLoading by remember { mutableStateOf(false) }
         val context = LocalContext.current
         val colors = LocalAppColors.current
+        val userName = UserManager.currentUser?.name ?: ""
 
         Column(
             modifier = Modifier
@@ -1183,16 +1320,25 @@ class MainActivity : ComponentActivity() {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-                    // 1. Top Header Bar
-        Text(
-            text = "Symptom Checker AI",
-            fontSize = scaledFontSize(26f).sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary,
-            textAlign = TextAlign.Center,
-            letterSpacing = (-0.5).sp,
-            modifier = Modifier.padding(top = 24.dp, bottom = 32.dp)
-        )
+            // Greeting and title
+            if (userName.isNotBlank()) {
+                Text(
+                    text = "Hi, $userName",
+                    fontSize = scaledFontSize(20f).sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(top = 24.dp)
+                )
+            }
+            Text(
+                text = "Symptom Checker AI",
+                fontSize = scaledFontSize(26f).sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary,
+                textAlign = TextAlign.Center,
+                letterSpacing = (-0.5).sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
+            )
 
             // 2. Input Card
             Card(
