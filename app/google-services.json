@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "977651443737",
+    "project_id": "symvora-2f932",
+    "storage_bucket": "symvora-2f932.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:977651443737:android:5e6bf84c3cb1f81196e288",
+        "android_client_info": {
+          "package_name": "com.example.symvora"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAl0ToNshgnqAvCuNdl4T38_kpLBZZCef4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
