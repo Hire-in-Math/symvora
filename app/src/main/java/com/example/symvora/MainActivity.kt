@@ -189,6 +189,10 @@ object FirebaseService {
         val uid = auth.currentUser?.uid ?: throw IllegalStateException("Not authenticated")
         db.collection("users").document(uid).update("name", newName).await()
     }
+
+    fun logout() {
+        auth.signOut()
+    }
 }
 
 // Global history storage
@@ -983,6 +987,34 @@ class MainActivity : ComponentActivity() {
                             text = "Save Password",
                             fontSize = scaledFontSize(14f).sp,
                             fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Divider(
+                        modifier = Modifier.padding(vertical = 16.dp),
+                        color = colors.textTertiary.copy(alpha = 0.2f)
+                    )
+
+                    Button(
+                        onClick = {
+                            FirebaseService.logout()
+                            UserManager.currentUser = null
+                            Toast.makeText(context, "Logged out", Toast.LENGTH_SHORT).show()
+                            onNavigate(Screen.Welcome)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFEF5350),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "Log Out",
+                            fontSize = scaledFontSize(14f).sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                     }
