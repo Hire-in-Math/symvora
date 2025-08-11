@@ -37,6 +37,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
 import com.example.symvora.ui.theme.SymvoraTheme
+import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -99,7 +105,7 @@ object ThemeManager {
 data class User(
     val email: String,
     var name: String,
-    var password: String
+    var password: String? = null
 )
 
 object UserManager {
@@ -108,35 +114,9 @@ object UserManager {
     val isAuthenticated: Boolean
         get() = currentUser != null
 
-    fun signUp(name: String, email: String, password: String): Boolean {
-        currentUser = User(email = email, name = name, password = password)
-        return true
-    }
-
-    fun login(email: String, password: String): Boolean {
-        // For demo purposes: allow login if email matches and password matches current user
-        // If there is no current user yet, allow login to create a session with provided creds
-        val existing = currentUser
-        return if (existing == null) {
-            // Create a temporary user with unknown name
-            currentUser = User(email = email, name = email.substringBefore("@"), password = password)
-            true
-        } else if (existing.email.equals(email, ignoreCase = true) && existing.password == password) {
-            true
-        } else {
-            false
-        }
-    }
-
     fun updateName(newName: String) {
         currentUser?.let { user ->
             currentUser = user.copy(name = newName)
-        }
-    }
-
-    fun updatePassword(newPassword: String) {
-        currentUser?.let { user ->
-            currentUser = user.copy(password = newPassword)
         }
     }
 }
@@ -170,6 +150,46 @@ data class SymptomHistoryEntry(
     val aiResponse: String,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+// Firebase integration
+object FirebaseService {
+    private val auth = Firebase.auth
+    private val db = Firebase.firestore
+
+    suspend fun loadCurrentUser(): User? {
+        val firebaseUser = auth.currentUser ?: return null
+        val uid = firebaseUser.uid
+        val doc = db.collection("users").document(uid).get().await()
+        val name = doc.getString("name") ?: firebaseUser.email?.substringBefore("@") ?: ""
+        val email = firebaseUser.email ?: return null
+        return User(email = email, name = name)
+    }
+
+    suspend fun signUp(name: String, email: String, password: String): User {
+        auth.createUserWithEmailAndPassword(email, password).await()
+        val uid = auth.currentUser?.uid ?: throw IllegalStateException("No UID after signup")
+        val profile = mapOf(
+            "name" to name,
+            "email" to email,
+            "createdAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("users").document(uid).set(profile).await()
+        return User(email = email, name = name)
+    }
+
+    suspend fun login(email: String, password: String): User {
+        auth.signInWithEmailAndPassword(email, password).await()
+        val uid = auth.currentUser?.uid ?: throw IllegalStateException("No UID after login")
+        val doc = db.collection("users").document(uid).get().await()
+        val name = doc.getString("name") ?: email.substringBefore("@")
+        return User(email = email, name = name)
+    }
+
+    suspend fun updateName(newName: String) {
+        val uid = auth.currentUser?.uid ?: throw IllegalStateException("Not authenticated")
+        db.collection("users").document(uid).update("name", newName).await()
+    }
+}
 
 // Global history storage
 object SymptomHistoryManager {
@@ -253,6 +273,16 @@ class MainActivity : ComponentActivity() {
                 SymvoraTheme(darkTheme = ThemeManager.isDarkMode) {
                     var currentScreen by remember { mutableStateOf(Screen.Welcome) }
                     val isAuthenticated by remember { derivedStateOf { UserManager.isAuthenticated } }
+
+                    // Attempt to auto-login existing Firebase user
+                    LaunchedEffect(Unit) {
+                        try {
+                            val loaded = FirebaseService.loadCurrentUser()
+                            if (loaded != null) {
+                                UserManager.currentUser = loaded
+                            }
+                        } catch (_: Exception) { }
+                    }
 
                     // Enforce authentication gating
                     LaunchedEffect(isAuthenticated, currentScreen) {
@@ -600,6 +630,7 @@ class MainActivity : ComponentActivity() {
         var currentPassword by remember { mutableStateOf("") }
         var newPassword by remember { mutableStateOf("") }
         var confirmNewPassword by remember { mutableStateOf("") }
+        val scope = rememberCoroutineScope()
 
         val colors = ThemeManager.colors
         val settingsScrollState = rememberScrollState()
@@ -847,8 +878,15 @@ class MainActivity : ComponentActivity() {
                             if (editableName.isBlank()) {
                                 Toast.makeText(context, "Name cannot be empty", Toast.LENGTH_SHORT).show()
                             } else {
-                                UserManager.updateName(editableName)
-                                Toast.makeText(context, "Name updated", Toast.LENGTH_SHORT).show()
+                                scope.launch {
+                                    try {
+                                        FirebaseService.updateName(editableName)
+                                        UserManager.updateName(editableName)
+                                        Toast.makeText(context, "Name updated", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, e.message ?: "Failed to update name", Toast.LENGTH_LONG).show()
+                                    }
+                                }
                             }
                         },
                         modifier = Modifier
@@ -911,18 +949,27 @@ class MainActivity : ComponentActivity() {
 
                     Button(
                         onClick = {
-                            val user = UserManager.currentUser
+                            val authUser = Firebase.auth.currentUser
                             when {
-                                user == null -> Toast.makeText(context, "Not authenticated", Toast.LENGTH_SHORT).show()
-                                currentPassword != user.password -> Toast.makeText(context, "Current password is incorrect", Toast.LENGTH_SHORT).show()
+                                authUser == null -> Toast.makeText(context, "Not authenticated", Toast.LENGTH_SHORT).show()
                                 newPassword.length < 6 -> Toast.makeText(context, "New password must be at least 6 characters", Toast.LENGTH_SHORT).show()
                                 newPassword != confirmNewPassword -> Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
                                 else -> {
-                                    UserManager.updatePassword(newPassword)
-                                    currentPassword = ""
-                                    newPassword = ""
-                                    confirmNewPassword = ""
-                                    Toast.makeText(context, "Password updated", Toast.LENGTH_SHORT).show()
+                                    scope.launch {
+                                        try {
+                                            val email = authUser.email ?: UserManager.currentUser?.email
+                                            if (email.isNullOrBlank()) throw IllegalStateException("No email on account")
+                                            val credential = EmailAuthProvider.getCredential(email, currentPassword)
+                                            authUser.reauthenticate(credential).await()
+                                            authUser.updatePassword(newPassword).await()
+                                            currentPassword = ""
+                                            newPassword = ""
+                                            confirmNewPassword = ""
+                                            Toast.makeText(context, "Password updated", Toast.LENGTH_SHORT).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, e.message ?: "Failed to update password", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -1098,11 +1145,13 @@ class MainActivity : ComponentActivity() {
     fun SignUpScreen(onNavigate: (Screen) -> Unit) {
         val colors = LocalAppColors.current
         val context = LocalContext.current
+        val scope = rememberCoroutineScope()
 
         var name by remember { mutableStateOf("") }
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
         var confirmPassword by remember { mutableStateOf("") }
+        var isSubmitting by remember { mutableStateOf(false) }
 
         Column(
             modifier = Modifier
@@ -1182,9 +1231,19 @@ class MainActivity : ComponentActivity() {
                                 password.length < 6 -> Toast.makeText(context, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
                                 password != confirmPassword -> Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
                                 else -> {
-                                    UserManager.signUp(name = name, email = email, password = password)
-                                    Toast.makeText(context, "Account created!", Toast.LENGTH_SHORT).show()
-                                    onNavigate(Screen.Symptoms)
+                                    scope.launch {
+                                        isSubmitting = true
+                                        try {
+                                            val user = FirebaseService.signUp(name, email, password)
+                                            UserManager.currentUser = user
+                                            Toast.makeText(context, "Account created!", Toast.LENGTH_SHORT).show()
+                                            onNavigate(Screen.Symptoms)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, e.message ?: "Signup failed", Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            isSubmitting = false
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -1194,11 +1253,15 @@ class MainActivity : ComponentActivity() {
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
                     ) {
-                        Text(
-                            text = "Create Account",
-                            fontSize = scaledFontSize(16f).sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        if (isSubmitting) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text(
+                                text = "Create Account",
+                                fontSize = scaledFontSize(16f).sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
@@ -1218,9 +1281,11 @@ class MainActivity : ComponentActivity() {
     fun LoginScreen(onNavigate: (Screen) -> Unit) {
         val colors = LocalAppColors.current
         val context = LocalContext.current
+        val scope = rememberCoroutineScope()
 
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
+        var isSubmitting by remember { mutableStateOf(false) }
 
         Column(
             modifier = Modifier
@@ -1274,12 +1339,18 @@ class MainActivity : ComponentActivity() {
                                     Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
                                 !isEmailValid -> Toast.makeText(context, "Enter a valid email", Toast.LENGTH_SHORT).show()
                                 else -> {
-                                    val success = UserManager.login(email = email, password = password)
-                                    if (success) {
-                                        Toast.makeText(context, "Logged in!", Toast.LENGTH_SHORT).show()
-                                        onNavigate(Screen.Symptoms)
-                                    } else {
-                                        Toast.makeText(context, "Invalid credentials", Toast.LENGTH_SHORT).show()
+                                    scope.launch {
+                                        isSubmitting = true
+                                        try {
+                                            val user = FirebaseService.login(email, password)
+                                            UserManager.currentUser = user
+                                            Toast.makeText(context, "Logged in!", Toast.LENGTH_SHORT).show()
+                                            onNavigate(Screen.Symptoms)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, e.message ?: "Login failed", Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            isSubmitting = false
+                                        }
                                     }
                                 }
                             }
@@ -1290,11 +1361,15 @@ class MainActivity : ComponentActivity() {
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = Color.White)
                     ) {
-                        Text(
-                            text = "Log In",
-                            fontSize = scaledFontSize(16f).sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                        if (isSubmitting) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text(
+                                text = "Log In",
+                                fontSize = scaledFontSize(16f).sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
