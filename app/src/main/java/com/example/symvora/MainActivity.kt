@@ -49,6 +49,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import com.example.symvora.DeepseekApi
 
 data class AppColors(
     val primary: Color,
@@ -269,6 +270,7 @@ enum class Screen {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DeepseekApi.setApiKey("sk-4295ec6627ab4663b710bd9a88528d8e")
         enableEdgeToEdge()
         setContent {
             val colors = ThemeManager.colors
@@ -1513,38 +1515,33 @@ class MainActivity : ComponentActivity() {
                             isLoading = true
                             resultText = "Analyzing symptoms..."
 
-                            CoroutineScope(Dispatchers.Main).launch {
-                                delay(2000) // 2 second delay
-
-                                val aiResponse = """
-                                Based on your symptoms, here are some general possibilities:
-                                
-                                Possible Conditions:
-                                • Common cold or flu
-                                • Seasonal allergies
-                                • Stress-related symptoms
-                                
-                                General Advice:
-                                • Rest and stay hydrated
-                                • Monitor your symptoms
-                                • Avoid self-diagnosis
-                                
-                                ⚠️ IMPORTANT: This is for informational purposes only. 
-                                Always consult a healthcare professional for proper diagnosis and treatment.
-                            """.trimIndent()
-
-                                resultText = aiResponse
-
-                                // Save to history
-                                SymptomHistoryManager.addEntry(
-                                    SymptomHistoryEntry(
-                                        symptoms = symptomText,
-                                        aiResponse = aiResponse
-                                    )
-                                )
-
-                                isLoading = false
+                            CoroutineScope(Dispatchers.IO).launch { // Use Dispatchers.IO for network operations
+                                try {
+                                    val aiResponse = DeepseekApi.getDiagnosis(symptomText)
+                                    with(Dispatchers.Main) { // Switch back to Main for UI updates
+                                        resultText = aiResponse
+                                    }
+                                } catch (e: Exception) {
+                                    with(Dispatchers.Main) {
+                                        resultText = "Error: ${e.message}"
+                                        Toast.makeText(context, "Error analyzing symptoms: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                                finally {
+                                    with(Dispatchers.Main) {
+                                        isLoading = false
+                                    }
+                                }
                             }
+
+                            // Save to history
+                            SymptomHistoryManager.addEntry(
+                                SymptomHistoryEntry(
+                                    symptoms = symptomText,
+                                    aiResponse = resultText // Use resultText which now holds AI response or error
+                                )
+                            )
+
                         } else {
                             Toast.makeText(
                                 context,
