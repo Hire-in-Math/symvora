@@ -34,7 +34,7 @@ object DeepseekApi {
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "system")
-                    put("content", "You are a helpful medical assistant. Provide a concise diagnosis and general advice based on the symptoms provided. Always include a disclaimer that the information is for informational purposes only and not a substitute for professional medical advice.")
+                    put("content", "You are a helpful medical assistant. Provide a concise diagnosis and general advice based on the symptoms provided. Do not use any markdown formatting like bolding or italics. Always include a disclaimer that the information is for informational purposes only and not a substitute for professional medical advice.")
                 })
                 put(JSONObject().apply {
                     put("role", "user")
