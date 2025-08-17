@@ -53,16 +53,21 @@ object DeepseekApi {
             .post(body)
             .build()
 
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("Unexpected code $response")
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IOException("Unexpected code $response")
+                }
+                val responseBody = response.body?.string() ?: ""
+                val jsonResponse = JSONObject(responseBody)
+                jsonResponse.getJSONArray("choices")
+                    .getJSONObject(0)
+                    .getJSONObject("message")
+                    .getString("content")
             }
-            val responseBody = response.body?.string() ?: ""
-            val jsonResponse = JSONObject(responseBody)
-            return jsonResponse.getJSONArray("choices")
-                .getJSONObject(0)
-                .getJSONObject("message")
-                .getString("content")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            "Error: ${e.message}"
         }
     }
 }
