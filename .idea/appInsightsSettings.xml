@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.example.symvora" />
+                  <option name="mobileSdkAppId" value="1:977651443737:android:5e6bf84c3cb1f81196e288" />
+                  <option name="projectId" value="symvora-2f932" />
+                  <option name="projectNumber" value="977651443737" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
