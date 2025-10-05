@@ -1,4 +1,4 @@
-package com.example.symvora
+package com.symvora.app
 
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient

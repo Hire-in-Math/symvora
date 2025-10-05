@@ -1,4 +1,4 @@
-package com.example.symvora
+package com.symvora.app
 
 import android.os.Bundle
 import android.widget.Toast
@@ -36,14 +36,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
-import com.example.symvora.ui.theme.SymvoraTheme
+import com.symvora.app.ui.theme.SymvoraTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
-import com.example.symvora.DeepseekApi
+import com.symvora.app.DeepseekApi
 
 data class AppColors(
     val primary: Color,
@@ -327,9 +327,9 @@ class MainActivity : ComponentActivity() {
 
         // Observe the mutable state list directly
         val historyState = SymptomHistoryManager.getHistoryState()
-        val historyEntries by derivedStateOf {
+        val historyEntries by remember { derivedStateOf {
             SymptomHistoryManager.searchEntries(searchQuery)
-        }
+        } }
         val dateFormat =
             remember { SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault()) }
         val colors = LocalAppColors.current

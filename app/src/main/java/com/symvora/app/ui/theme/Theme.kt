@@ -1,4 +1,4 @@
-package com.example.symvora.ui.theme
+package com.symvora.app.ui.theme
 
 import android.app.Activity
 import android.os.Build
