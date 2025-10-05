@@ -5,14 +5,14 @@ plugins {
 }
 
 android {
-    namespace = "com.example.symvora"
+    namespace = "com.symvora.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.symvora"
+        applicationId = "com.symvora.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -52,9 +52,10 @@ android {
 
 dependencies {
     // Firebase platform BOM to keep versions aligned
-    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-analytics")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
