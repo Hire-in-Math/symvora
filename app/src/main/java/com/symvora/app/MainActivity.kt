@@ -334,13 +334,10 @@ class MainActivity : ComponentActivity() {
             remember { SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.getDefault()) }
         val colors = LocalAppColors.current
 
-        // Ensure sample data is loaded only once on app start
+        // Initialize the history manager if not already done (without sample data)
         LaunchedEffect(Unit) {
-            // Only add sample data if this is the first time the app is running
-            // and there are no entries at all (not just empty from clearing)
-            if (SymptomHistoryManager.getAllEntries().isEmpty() && 
-                !SymptomHistoryManager.hasBeenInitialized()) {
-                SymptomHistoryManager.initializeWithSampleData()
+            if (!SymptomHistoryManager.hasBeenInitialized()) {
+                SymptomHistoryManager.setInitialized()
             }
         }
 
@@ -409,30 +406,6 @@ class MainActivity : ComponentActivity() {
                             unfocusedLabelColor = colors.textTertiary
                         )
                     )
-
-                    // Debug button to add test entry
-                    Button(
-                        onClick = {
-                            SymptomHistoryManager.addEntry(
-                                SymptomHistoryEntry(
-                                    symptoms = "Test symptom entry",
-                                    aiResponse = "This is a test AI response for debugging purposes."
-                                )
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = colors.primary,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = "Add Test Entry (Debug)",
-                            fontSize = scaledFontSize(12f).sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                 }
             }
 
@@ -459,14 +432,6 @@ class MainActivity : ComponentActivity() {
                             color = colors.textTertiary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 8.dp)
-                        )
-                        // Debug information
-                        Text(
-                            text = "Debug: Total entries = ${SymptomHistoryManager.getAllEntries().size}",
-                            fontSize = scaledFontSize(12f).sp,
-                            color = colors.textTertiary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(top = 16.dp)
                         )
                     }
                 }
